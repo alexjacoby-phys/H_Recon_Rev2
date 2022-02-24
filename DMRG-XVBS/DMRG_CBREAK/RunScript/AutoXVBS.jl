@@ -19,10 +19,11 @@ path = "../"
 include(join([path,"DMRjulia.jl"]))
 using .DMRjulia
 
-for i in 1:60
-    θ = 0.41+(1/60)*i*1.2
-    Ns = 15
-    MXM = 40 #6^Ns
+θarray = [0.5*π,0., 1.5]
+
+for θ in θarray
+    Ns = 20
+    MXM = 100 #6^Ns
     psi = makePsi0(Ns)
     H = XVBSmake(Int(Ns),cos(θ),0.25*sin(θ))
     #@time params = dmrg(psi,H,maxm=MXM,sweeps=250,cutoff=1E-9)
@@ -40,6 +41,3 @@ for i in 1:60
         writedlm(filename, savearray)
     end
 end
-
-#plot(2:Ns,YAX,title = string("SvN of xVBS Chain of Length ",Ns), label =  nothing, xlabel = "Bipartition Placement", ylabel = "Entanglement Entropy")
-#savefig(string(Ns,"_site"))

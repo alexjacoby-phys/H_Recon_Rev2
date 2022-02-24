@@ -208,6 +208,34 @@ function Z8(a::Float64,b::Float64)
   ThreeSiteMidDone = tens(ThreeSiteMid)
   return ThreeSiteMidDone
 end
+
+G = length(Generators)
+BQ = length(BiQuadLeft)
+FL = G+BQ
+BLL2 = zeros(Float64,6,6,G)
+BLR2 = zeros(Float64,G,6,6)
+BQL2 = zeros(Float64,6,6,BQ)
+BQR2 = zeros(Float64,BQ,6,6)
+for i in 1:G
+  BLL2[:,:,i] = Generators[i]
+  BLR2[i,:,:] = Generators[i]
+end
+for i in 1:BQ
+  BQL2[:,:,i] = BiQuadLeft[i]
+  BQR2[i,:,:] = BiQuadRight[i]
+end
+
+
+
+
+
+
+
+
+
+
+
+
 ############################################### Hamiltonian Maker-- Stitches all the ops together
 function XVBSmake(Ns::Integer, a::Float64, b::Float64)
    localopsarray = Vector{tens{Float64}}(undef, Ns)
