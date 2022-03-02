@@ -188,8 +188,204 @@ Gen , Id, Generators, BiQuadLeft, BiQuadRight = xVBSOps()
     psi = MPS(initTensor,1)
     return psi
   end
+  ######
+  ### symmetry breaking terms and Hamiltonian
+  #####
+  function flattencofs(M::Matrix{Float64})
+    for i in 1:4, j in 1:4
+      if M[i,j] !== 0.5*(M[i,j]+M[j,i])
+        print("error-- coefficient matrix not symmetric")
+        return "error-- matrix not symmetric"
+      end
+    end
+    indx = [[1,1],[1,2],[1,3],[1,4],[2,1],[2,2],[2,3],[2,4],[3,1],[3,2],[3,3],[3,4],[4,1],[4,2],[4,3],[4,4]]
+    cofs = zeros(Float64,16)
+    for i in 1:16
+      ind1 = indx[i][1]
+      ind2 = indx[i][2]
+      cofs[i]= M[ind1,ind2]
+    end
+    return cofs
+  end
+  function T1(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    FirstSite = zeros(Float64,1,6,6,1+G+BQ)
+    for i in 1:G
+      FirstSite[1,:,:,i] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      FirstSite[1,:,:,G+i]= b* BiQuadLeft[i]
+    end
+    FirstSite[1,:,:,1+G+BQ] = Id
+    FirstSiteDone = tens(FirstSite)
+    return FirstSiteDone
+  end
+
+  function T5()
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    LastSite = zeros(Float64,1+G+BQ,6,6,1)
+    LastSite[1,:,:,1] = Id
+    for i in 1:G
+      LastSite[1+i,:,:,1] = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      LastSite[1+G+i,:,:,1]=BiQuadRight[i]
+    end
+    LastSiteDone = tens(LastSite)
+    return LastSiteDone
+  end
+
+############################################### OPLIST for next to ends of chains
+  function T2(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    NextToFirstSite = zeros(Float64,1+G+BQ,6,6,2+G+BQ)
+    NextToFirstSite[1+G+BQ,:,:,2+G+BQ] = Id
+    for i in 1:G
+      NextToFirstSite[i,:,:,1]  = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      NextToFirstSite[G+i,:,:,1]  = BiQuadRight[i]
+    end
+    for i in 1:G
+        NextToFirstSite[1+G+BQ,:,:,1+i] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      NextToFirstSite[1+G+BQ,:,:,i+G+1] = b*BiQuadLeft[i]
+    end
+    NextToFirstSiteDone = tens(NextToFirstSite)
+    return NextToFirstSiteDone
+  end
+  function T4(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    NextToLastSite = zeros(Float64,2+G+BQ,6,6,1+G+BQ)
+    NextToLastSite[1,:,:,1] = Id
+    for i in 1:G
+      NextToLastSite[i+1,:,:,1] = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      NextToLastSite[i+G+1,:,:,1] = BiQuadRight[i]
+    end
+    for i in 1:G
+      NextToLastSite[G+BQ+2,:,:,i+1] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      NextToLastSite[G+BQ+2,:,:,i+G+1] = b*BiQuadLeft[i]
+    end
+    NextToLastSiteDone = tens(NextToLastSite)
+    return NextToLastSiteDone
+  end
+############################################### OPLIST for middle sites
+  function T3(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    MiddleSite = zeros(Float64,G+BQ+2,6,6,G+BQ+2)
+    MiddleSite[1,:,:,1] = Id
+    MiddleSite[G+BQ+2,:,:,G+BQ+2] = Id
+    for i in 1:G
+      MiddleSite[i+1,:,:,1] = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      MiddleSite[i+1+G,:,:,1] = BiQuadRight[i]
+    end
+    for i in 1:G
+      MiddleSite[G+BQ+2,:,:,1+i] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      MiddleSite[G+BQ+2,:,:,i+G+1] = b*BiQuadLeft[i]
+    end
+    MiddleSiteDone = tens(MiddleSite)
+    return MiddleSiteDone
+  end
+############################################### OPLIST for 2 site case
+  function T6(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    TwoSiteL = zeros(Float64,1,6,6,BQ+G)
+    for i in 1:G
+      TwoSiteL[1,:,:,i] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      TwoSiteL[1,:,:,i+G] = b*BiQuadLeft[i]
+    end
+    TwoSiteLDone = tens(TwoSiteL)
+    return TwoSiteLDone
+  end
+  function T7()
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    TwoSiteR = zeros(Float64,G+BQ,6,6,1)
+    for i in 1:G
+      TwoSiteR[i,:,:,1] = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      TwoSiteR[i+G,:,:,1] = BiQuadRight[i]
+    end
+    TwoSiteRDone = tens(TwoSiteR)
+    return TwoSiteRDone
+  end
+############################################### OPLIST for 3 site case
+  function T8(a::Float64,b::Float64,m::Matrix{Float64})
+    cofs = flattencofs(m)
+    G = length(Generators)
+    BQ = length(BiQuadLeft)
+    ThreeSiteMid = zeros(Float64,G+BQ+1,6,6,G+BQ+1)
+    for i in 1:G
+      ThreeSiteMid[i,:,:,1]  = transpose(Generators[i])
+    end
+    for i in 1:BQ
+      ThreeSiteMid[i+G,:,:,1] = BiQuadRight[i]
+    end
+    for i in 1:G
+      ThreeSiteMid[BQ+G+1,:,:,1+i] = (cofs[i]+a)*Generators[i]
+    end
+    for i in 1:BQ
+      ThreeSiteMid[BQ+G+1,:,:,1+G+i] = b*BiQuadLeft[i]
+    end
+    ThreeSiteMidDone = tens(ThreeSiteMid)
+    return ThreeSiteMidDone
+  end
+############################################### Hamiltonian Maker-- Stitches all the ops together
+  function XVBSmake2(Ns::Integer, a::Float64, b::Float64,m::Matrix{Float64})
+     localopsarray = Vector{tens{Float64}}(undef, Ns)
+     if Ns == 1
+       return print("This is an error message! You need more than one site friend!")
+     elseif Ns >= 5
+       localopsarray[1] = T1(a,b,m)
+       localopsarray[Ns] = T5()
+       ###############################################
+       localopsarray[2] =T2(a,b,m)
+       localopsarray[Ns-1] = T4(a,b,m)
+       ###############################################
+       for i in 3:Ns-2
+         localopsarray[i] = T3(a,b,m)
+       end
+     elseif Ns == 4
+       localopsarray[1] = T1(a,b,m)
+       localopsarray[2] = T2(a,b,m)
+       localopsarray[3] = T4(a,b,m)
+       localopsarray[4] = T5()
+     elseif Ns == 2
+       localopsarray[1] = T6(a,b,m)
+       localopsarray[2] = T7()
+     elseif Ns == 3
+       localopsarray[1] = T1(a,b,m)
+       localopsarray[2] = T8(a,b,m)
+       localopsarray[3] = T5()
+     end
+     Hamiltonian = MPO(localopsarray)
+    return Hamiltonian
+  end
 
 
 
-  export  XVBSmake, makePsi0
+  export  XVBSmake, makePsi0, XVBSmake2
 end
