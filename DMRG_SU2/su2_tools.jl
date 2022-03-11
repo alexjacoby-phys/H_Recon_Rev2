@@ -17,11 +17,15 @@ function makePsi0(s::Float64,Ns::Integer)
 end
 
 # iteratively constructs the MPO for a given "power" of spin terms, e.g. power 3 -> \sum_{ijk} S_i S_j S_k
-function S_pow_iterative(H, spin_mag::Float64, curr_op, start_index::Integer, npowers::Integer, curr_power::Integer, J)
-    # npowers is the number of terms in the spin sum, e.g. 3 in the above example
-    # curr_power is where we are in the nested sum, e.g. S_i -> 1, S_j -> 2, and S_k -> 3 in above example
-    # start_index keeps track of where we are in the larger MPO (which is a direct product of different "npowers" calls to this iterative function)
-    # curr_op just keeps track of the preceding terms in the spin product, e.g. for S_k (curr_power = 3) curr_op would be S_i S_j.
+function iterativePowerS(H, spin_mag::Float64, curr_op, start_index::Integer, npowers::Integer, curr_power::Integer, J_tensor)
+
+    # H:           MPO reference (acts in place)
+    # spin_mag:    Spin magnitude
+    # curr_op:     keeps track of the preceding terms in the spin product, e.g. for S_k (curr_power = 3) curr_op would be S_i S_j.
+    # start_index: keeps track of where we are in the larger MPO (which is a direct product of different "npowers" calls to this iterative function)
+    # npowers:     the number of terms in the spin sum, e.g. 3 in the above example
+    # curr_power:  where we are in the nested sum, e.g. S_i -> 1, S_j -> 2, and S_k -> 3 in above example
+    # J_tensor:    a nested list of depth (npowers - curr_power + 1), has the collection of J_terms we want for our model
     
     Sx,Sy,Sz,Sp,Sm,O,Id = spinOps(spinmag)
     Sop_arr = [Sx,Sy,Sz] # spin operators
@@ -37,7 +41,7 @@ function S_pow_iterative(H, spin_mag::Float64, curr_op, start_index::Integer, np
 
             op_h = curr_op*Sop_arr[dim]; # generate final operator
             
-            H[idx_start:(idx_start+nSpin-1),1:nSpin] = -J*op_h # first column (has J!)
+            H[idx_start:(idx_start+nSpin-1),1:nSpin] = J_tensor[dim]*op_h # first column (has J!)
                 
             H[lr_start:(lr_start+nSpin-1),idx_start:(idx_start+nSpin-1)] = op_h # last column (no J!)
                 
@@ -47,10 +51,59 @@ function S_pow_iterative(H, spin_mag::Float64, curr_op, start_index::Integer, np
             op_h = curr_op*Sop_arr[dim] # add term to operator product
             stride_idx = 3^(npowers-curr_power) # figure out how wide the next block will be
             # iterate!
-            S_pow_iterative(H, spin_mag, op_h, start_index + nSpin*stride_idx*(dim-1), npowers, curr_power+1, J) 
+            iterativePowerS(H, spin_mag, op_h, start_index + nSpin*stride_idx*(dim-1), npowers, curr_power+1, J_tensor[dim]) 
         end
     end
         
+end
+
+# makes a J_tensor of specific power with fixed values J
+function makeIsotropicJ(power::Integer,J::Float64)
+    
+    J_here = Vector()
+    J_next = Vector()
+    
+    for depth = 1:power
+        if (depth == 1) # lowest level, just make a 3x1 array, [J, J, J]
+            for dim = 1:3
+                 push!(J_here,J)
+            end
+        else # otherwise, make nested lists
+            for dim = 1:3
+                push!(J_next,J_here)
+            end
+            J_here = J_next
+            J_next = Vector()
+        end
+    end
+    
+    return J_here
+    
+end
+
+# makes a J_tensor of specific power with random values between [-J,J]
+function makeRandomJ(power::Integer,J::Float64)
+    
+    J_here = Vector()
+    J_next = Vector()
+    
+    for depth = 1:power
+        if (depth == 1) # lowest level, just make a 3x1 array, [J, J, J]
+            for dim = 1:3
+                 mc = 2.0*(rand(1)[1]-0.5) # randomly distributed between [-1,1]
+                 push!(J_here,J*mc)
+            end
+        else # otherwise, make nested lists
+            for dim = 1:3
+                push!(J_next,J_here)
+            end
+            J_here = J_next
+            J_next = Vector()
+        end
+    end
+    
+    return J_here
+    
 end
 
 # construct the Heisenberg chain MPO
@@ -74,7 +127,8 @@ function H_SU2(s::Float64, J_arr)
     start_index = 1 + n;
     
     for p = 1:max_p # add terms associated with each power, (S*S)^p
-        S_pow_iterative(H_n, s, Id, start_index, p, 1, J_arr[p]) # iterative construction of (S*S)^p
+        J_tensor = makeIsotropicJ(p, J_arr[p]) # make isotropic J_tensor with specified magnitude
+        iterativePowerS(H_n, s, Id, start_index, p, 1, J_tensor) # iterative construction of (S*S)^p
         start_index = start_index + n*(3^p) # keep track of the H index for each (S*S)^p group!
     end
     return H_n 
