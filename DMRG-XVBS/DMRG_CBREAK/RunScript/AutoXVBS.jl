@@ -18,21 +18,6 @@ using DelimitedFiles
 path = "../"
 include(join([path,"DMRjulia.jl"]))
 using .DMRjulia
-
-θarray = [0.58]
-
-for θ in θarray
-    Ns = 11
-    MXM = 20 #6^Ns
-    psi = makePsi0(Ns)
-    H = XVBSmake2(Ns,1/2,1/12#=Int(Ns),cos(θ),0.25*sin(θ)=#,zeros(Float64,4,4))
-    #@time params = dmrg(psi,H,maxm=MXM,sweeps=250,cutoff=1E-9)
-    nD = MXM # number of elements of sqrt(rho) to save
-    dummy_D = zeros(nD)
-    @time params = dmrg(psi,H,maxm=MXM,sweeps=100,cutoff=1E-8, storeD=dummy_D,allSvNbond=true)
-end
-
-
 function SavePsi(psi,filename::String)
 #must have DelimitedFiles package in environment
     mkdir(filename)
@@ -74,14 +59,50 @@ function ReadPsi(filename)
     return MPS(psi_typed)
 end
 
+fn  ="L=30-M=60at-theta0-10sweeps"
+string(fn,"/T.txt")
 
-Y1 = params.SvNvec
-Y2 = params.Dvec
-popfirst!(Y1)
-popfirst!(Y2)
-savearray = [θ,Vector(2:Ns),Y1,Y2]
-filename = string("DMRG_EE_ThetaIt=",i,"_Sites=",Ns,".txt")
-touch(filename)
-open(filename,"w") do io
-    writedlm(filename, savearray)
+function UpdatePsi(psi,filename::String)
+    A = string(filename,"/size.txt")
+    B = string(filename,"/T.txt")
+
 end
+
+θarray = [0]
+
+# for θ in θarray
+#     Ns = 5
+#     MXM = 10 #6^Ns
+#     psi = makePsi0(Ns)
+#     H = XVBSmake2(Int(Ns),cos(θ),0.25*sin(θ),zeros(Float64,4,4))
+#     #@time params = dmrg(psi,H,maxm=MXM,sweeps=250,cutoff=1E-9)
+#     nD = MXM # number of elements of sqrt(rho) to save
+#     dummy_D = zeros(nD)
+#     @time params = dmrg(psi,H,maxm=MXM,sweeps=1,cutoff=1E-8, storeD=dummy_D,allSvNbond=true)
+# end
+
+θ = 0.
+Ns = 30
+MXM = 60 #6^Ns
+psi = ReadPsi("L=30-M=60at-theta0-10sweeps")#makePsi0(Ns)
+H = XVBSmake2(Int(Ns),cos(θ),0.25*sin(θ),zeros(Float64,4,4))
+#@time params = dmrg(psi,H,maxm=MXM,sweeps=250,cutoff=1E-9)
+nD = MXM # number of elements of sqrt(rho) to save
+dummy_D = zeros(nD)
+@time params = dmrg(psi,H,maxm=MXM,sweeps=10,cutoff=1E-9, storeD=dummy_D,allSvNbond=false#=true=#,cvgE = true, noise = 0., noise_incr = 0.)
+expect(psi,H)
+
+
+expect(ReadPsi("L=30-M=60at-theta0-20sweeps"),H)
+expect(ReadPsi("L=30-M=60at-theta0-10sweeps"),H)
+
+# Y1 = params.SvNvec
+# Y2 = params.Dvec
+# popfirst!(Y1)
+# popfirst!(Y2)
+# savearray = [θ,Vector(2:Ns),Y1,Y2]
+# filename = string("DMRG_EE_ThetaIt=",i,"_Sites=",Ns,".txt")
+# touch(filename)
+# open(filename,"w") do io
+#     writedlm(filename, savearray)
+# end
